@@ -1,0 +1,130 @@
+fileFormatVersion: 2
+guid: 24eb32ccee65be94392efa2cea65dae1
+ModelImporter:
+  serializedVersion: 15
+  fileIDToRecycleName:
+    100000: back01
+    100002: backup01
+    100004: backup02
+    100006: chassis01
+    100008: d01
+    100010: glass01
+    100012: INT01
+    100014: mini01
+    100016: //RootNode
+    100018: static_rotor03
+    100020: static_rotor04
+    100022: VRaySun01
+    100024: VRaySun01.Target
+    100026: wheel_lb01
+    100028: wheel_rb01
+    100030: wheel_rf01
+    400000: back01
+    400002: backup01
+    400004: backup02
+    400006: chassis01
+    400008: d01
+    400010: glass01
+    400012: INT01
+    400014: mini01
+    400016: //RootNode
+    400018: static_rotor03
+    400020: static_rotor04
+    400022: VRaySun01
+    400024: VRaySun01.Target
+    400026: wheel_lb01
+    400028: wheel_rb01
+    400030: wheel_rf01
+    2300000: back01
+    2300002: backup01
+    2300004: backup02
+    2300006: chassis01
+    2300008: d01
+    2300010: glass01
+    2300012: INT01
+    2300014: mini01
+    2300016: static_rotor03
+    2300018: static_rotor04
+    2300020: wheel_lb01
+    2300022: wheel_rb01
+    2300024: wheel_rf01
+    3300000: back01
+    3300002: backup01
+    3300004: backup02
+    3300006: chassis01
+    3300008: d01
+    3300010: glass01
+    3300012: INT01
+    3300014: mini01
+    3300016: static_rotor03
+    3300018: static_rotor04
+    3300020: wheel_lb01
+    3300022: wheel_rb01
+    3300024: wheel_rf01
+    4300000: wheel_rf01
+    4300002: wheel_rb01
+    4300004: wheel_lb01
+    4300006: chassis01
+    4300008: glass01
+    4300010: d01
+    4300012: back01
+    4300014: backup01
+    4300016: backup02
+    4300018: INT01
+    4300020: mini01
+    4300022: static_rotor03
+    4300024: static_rotor04
+    7400000: Take 001
+    9500000: //RootNode
+  materials:
+    importMaterials: 1
+    materialName: 0
+    materialSearch: 1
+  animations:
+    legacyGenerateAnimations: 4
+    bakeSimulation: 0
+    animationCompression: 1
+    animationRotationError: .5
+    animationPositionError: .5
+    animationScaleError: .5
+    animationWrapMode: 0
+    clipAnimations: []
+    isReadable: 1
+  meshes:
+    lODScreenPercentages: []
+    globalScale: .00999999978
+    meshCompression: 0
+    addColliders: 0
+    importBlendShapes: 1
+    swapUVChannels: 0
+    generateSecondaryUV: 0
+    useFileUnits: 1
+    optimizeMeshForGPU: 1
+    weldVertices: 1
+    secondaryUVAngleDistortion: 8
+    secondaryUVAreaDistortion: 15.000001
+    secondaryUVHardAngle: 88
+    secondaryUVPackMargin: 4
+  tangentSpace:
+    normalSmoothAngle: 60
+    splitTangentsAcrossUV: 1
+    normalImportMode: 0
+    tangentImportMode: 1
+  importAnimation: 1
+  copyAvatar: 0
+  humanDescription:
+    human: []
+    skeleton: []
+    handles: []
+    armTwist: .5
+    foreArmTwist: .5
+    upperLegTwist: .5
+    legTwist: .5
+    armStretch: .0500000007
+    legStretch: .0500000007
+    feetSpacing: 0
+    rootMotionBoneName: 
+  lastHumanDescriptionAvatarSource: {instanceID: 0}
+  additionalBone: 1
+  animationType: 2
+  userData: 

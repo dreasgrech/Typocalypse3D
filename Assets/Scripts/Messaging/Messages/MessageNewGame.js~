@@ -1,0 +1,18 @@
+#pragma strict
+#pragma implicit
+#pragma downcast
+
+public class MessageNewGame extends Message {
+
+	public var Difficulty : difficulty;
+
+	function MessageNewGame(difficulty : float) {
+		Difficulty = difficulty;
+		super("game");
+	}
+
+}
+
+
+
+

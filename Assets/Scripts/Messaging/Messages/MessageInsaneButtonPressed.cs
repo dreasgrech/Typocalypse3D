@@ -1,0 +1,10 @@
+
+public class MessageInsaneButtonPressed : Message {
+
+	public MessageInsaneButtonPressed() : base("game") 
+    {
+        Send();
+	}
+}
+
+

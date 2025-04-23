@@ -1,0 +1,16 @@
+#pragma strict
+#pragma implicit
+#pragma downcast
+
+public class MessageEnemyStrike extends Message {
+
+	public var Enemy : EnemyBehaviour;
+
+	function MessageEnemyStrike(enemy : EnemyBehaviour) {
+		Enemy = enemy;
+		super("game");
+	}
+
+}
+
+

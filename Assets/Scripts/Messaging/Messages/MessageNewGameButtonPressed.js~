@@ -1,0 +1,11 @@
+
+public class MessageNewGameButtonPressed : Message {
+
+	public MessageNewGameButtonPressed() : base("game") {
+	}
+
+}
+
+
+
+

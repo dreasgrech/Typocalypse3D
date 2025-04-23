@@ -1,0 +1,15 @@
+
+public class MessageDifficultyChanged : Message {
+
+	public MessageDifficultyChanged() : base("difficulty") {
+	}
+
+}
+
+function Start () {
+
+}
+
+function Update () {
+
+}

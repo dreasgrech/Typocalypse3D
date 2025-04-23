@@ -1,0 +1,15 @@
+#pragma strict
+#pragma implicit
+#pragma downcast
+
+public class MessageFinishedWord extends Message {
+
+	public var Key : String;
+
+	function MessageKeyPressed(key : String) {
+		Key = key;
+		super("typing");
+	}
+
+}
+

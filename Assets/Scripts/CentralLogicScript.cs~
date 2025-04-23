@@ -1,0 +1,834 @@
+using System.Globalization;
+using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System;
+using System.IO;
+using System.Linq;
+
+public class Entrance {
+	public Vector3 Left {get; set;}
+	public Vector3 Right {get; set;}
+
+	public Entrance(Vector3 left, Vector3 right) {
+		Left = left;
+		Right = right;
+	}
+}
+
+// TODO: I think paused shouldn't be a state of its own
+public enum LevelStates
+{
+    IncrementingWaveNumber,
+    DoingWave,
+    WaitingToClearRemainingEnemies,
+    WaveStatistics, // The pause between each wave
+    BossBattle,
+    LevelStatisticsTransition,
+    LevelStatistics,
+}
+
+public class CentralLogicScript : StateMachine<LevelStates>
+{
+    public float debugDifficulty;
+    public int timeAllocatedToWaveSeconds;
+    public int wavesBeforeBoss;
+	public KeyManager keyManager;
+    public HUDManager hudManager;
+    public HeartbeatMonitor heartbeatMonitor;
+	public UILabel scoreBoard;
+	public UILabel waveNumberHUD;
+	public UILabel currentWaveAccuracyHUD;
+	public UILabel wpmHUD;
+    public UIPanel PausedMenu;
+    public UIPanelSlider stressSlider;
+    public UIPanel waveCompletePanel;
+    public MotionBlur motionBlur;
+	public GameObject marker;
+	public GameObject enemyModel;
+    public Camera MainCamera;
+    public Camera uiCamera;
+    public AudioClip waveStartAudio;
+    public GameObject boss;
+    public KongregateAPI kongregateApi;
+    public TiltShift tiltShiftEffect; // used for the depth of field
+    public Transform enemyModelsHolder;
+    public ScoreComboManager ScoreComboManager;
+    public PowerupManager powerupManager;
+    public PausedMenu pausedMenu;
+    public LayerMask letterlayer;
+
+	private AudioManager audioManager;
+	private GameObject spawnPoint;
+    private float difficulty; // will contain the difficulty (1 - 100);
+	private float enemySpawnInterval; // delay in seconds for enemy spawning
+    private const float difficultyRange = 10;
+    private List<string> words;
+    private float wordDifficultyPercentage = 1;
+    private int currentWave;
+    private HashSet<IEnemy> enemiesOnScreen;
+    private const float baseStressIncrement = 0.1f;
+    private List<GameObject> enemyModels;
+    private GameStatisticsLevel currentLevelStatistics;
+    private bool wasBossReleased;
+    private PlayerBehaviour player;
+    private BossBehaviour bossBehaviour;
+    private bool cameraLookingAtBoss;
+
+    /*
+	private static float yEntrance = 0;
+	private static float zEntrance = -9.817513f;
+	private List<Entrance> entrances = new List<Entrance>() {
+		new Entrance(new Vector3(9.363613f, yEntrance, zEntrance), new Vector3(6.781803f, yEntrance, zEntrance)),
+		new Entrance(new Vector3(0.5166297f, yEntrance, zEntrance), new Vector3(-1.697498f, yEntrance, zEntrance)),
+		new Entrance(new Vector3(-7.60805f, yEntrance, zEntrance), new Vector3(-9.604151f, yEntrance, zEntrance))
+	};
+	*/
+
+    private IEnumerator Start()
+    {
+        Time.timeScale = 1;
+        GameStatistics.Instance.Reset();
+        GameSettings.GameCamera = MainCamera;
+        GameSettings.UICamera = uiCamera;
+
+        scoreBoard.supportEncoding = true; // to enable per-letter coloring via [color] encodes
+        UpdateScoreLabel(0f); // Set the initial score
+
+#if UNITY_EDITOR
+        var kongregateBrainObject = new GameObject();
+        var kongregateBrain = kongregateBrainObject.AddComponent<KongregateBrainAPI>();
+        kongregateBrain.UserInfo = new KongregateUserInfo();
+
+#else
+        var kongregateBrain = FindObjectOfType(typeof (KongregateBrainAPI)) as KongregateBrainAPI;
+#endif
+
+        Debug.Log("User info: " + kongregateBrain.UserInfo.Username);
+
+        // Lock cursor so that in Web mode when using the sniper (mouse), it won't exit the content area (unless the user presses escape)
+        Screen.lockCursor = true;
+
+        //kongregateApi.InitiateAPI(info => {});
+
+        //Debug.Log(MainCamera.transform.position);
+        //IsDebug = true;
+        FlyingText.PrimeText("abcdefghijklmopqrstuvwxyz");
+        if (GameSettings.Difficulty == 0)
+        {
+            // We're working on this scene only, so no difficulty will be given to us by the menu
+            GameSettings.Difficulty = debugDifficulty;
+        }
+
+        player = GameObject.FindWithTag("Player").GetComponent<PlayerBehaviour>();
+
+        GameSettings.WaveTimeSeconds = timeAllocatedToWaveSeconds;
+        var levelSettings = GameObject.FindGameObjectWithTag("LevelSettings").GetComponent<LevelSettings>();
+        currentLevelStatistics = new GameStatisticsLevel(levelSettings.levelIndex);
+        GameStatistics.Instance.AddLevel(currentLevelStatistics);
+
+        enemyModels = new List<GameObject>();
+        foreach (Transform model in enemyModelsHolder)
+        {
+            enemyModels.Add(model.gameObject);
+        }
+
+        audioManager = (AudioManager) FindObjectOfType(typeof (AudioManager));
+        enemiesOnScreen = new HashSet<IEnemy>();
+
+        difficulty = GameSettings.Difficulty;
+
+        audioManager.PlayNormalMusic();
+
+        spawnPoint = GameObject.FindWithTag("Spawnpoint");
+        words = ReadFile();
+
+        hudManager.StateChanged += (sender, args) =>
+                                       {
+                                           if (args.NewState == HUDState.ShowingStatisticsScreen)
+                                           {
+                                               CurrentState = LevelStates.LevelStatistics;
+                                           }
+                                       };
+
+        keyManager.AlphabeticalKeyPressed += KeyPressed;
+
+        Messenger.instance.Listen("game", gameObject);
+
+        ScoreComboManager.OnComboBroken += (sender, args) =>
+        {
+            UpdateScore(args.TotalPointsForCombo);
+
+            currentLevelStatistics.RecordCombo(args.TotalComboCount);
+        };
+
+        powerupManager.OnPowerupDestroyed += (sender, args) =>
+                                                 {
+                                                     // Wound the enemey
+                                                     var enemy = args.EnemyHit;
+                                                     KillEnemy(enemy, false);
+                                                 };
+        /*
+	    GameObject quitButton = PausedMenu.transform.Find("Quit").gameObject,
+	               resumeGamebutton = PausedMenu.transform.Find("Resume").gameObject;
+
+        UIEventListener.Get(resumeGamebutton).onClick += go =>
+                                                       {
+                                                           CurrentState = LevelStates.DoingWave;
+                                                       };
+
+	    UIEventListener.Get(quitButton).onClick += go =>
+	                                                   {
+	                                                       Time.timeScale = 1;
+	                                                       Application.LoadLevel("StartMenu");
+	                                                   };
+        */
+
+        enemySpawnInterval = HomelessMethods.Map(difficulty, 1f, 100f, 4f, 0.5f);
+
+        heartbeatMonitor.StartBeating();
+
+        //// Initiate HUD text
+        currentWaveAccuracyHUD.text = String.Format("{0}%", currentLevelStatistics.Accuracy);
+
+        // Start the game!
+        CurrentState = LevelStates.IncrementingWaveNumber;
+
+        while (true)
+        {
+            // var intervalBeforeNext = UnityEngine.Random.Range(5, 10);
+            var intervalBeforeNext = 5f;
+            yield return new WaitForSeconds(intervalBeforeNext);
+            powerupManager.DropPowerupContainer(new[] {GenerateWords(1).First()});
+        }
+    }
+
+    public void KillEnemy(IEnemy enemy, bool playerShoots)
+    {
+        var wasEnemyKilled = enemy.WordsLeft == 0;
+
+        // TODO: this is incorrect because the var is also set to true when there are no enemies on screen but more enemies are respawing
+        var isLastEnemyDeadWithWord = CurrentState == LevelStates.WaitingToClearRemainingEnemies && wasEnemyKilled && enemiesOnScreen.Count == 1;
+
+        var bullets = 3;
+
+        if (isLastEnemyDeadWithWord)
+        {
+            //StartCoroutine(FluctuateTimescale(0.5f, 0.2f));
+        }
+
+        // Tell the player to shoot the target
+        if (playerShoots)
+        {
+            player.Shoot(((MonoBehaviour) enemy).transform, bullets);
+        }
+
+        enemy.ApplyDamage(bullets);
+
+        // Reduce the stress level since this is a correct hit
+        stressSlider.MoveSlider(stressSlider.RealTimeValue - 0.1f, 0.5f);
+
+        motionBlur.blurAmount -= 0.05f;
+
+        // Record the word completed in the statistics
+        currentLevelStatistics.AddCompletedWord(enemy.Text);
+
+        if (wasEnemyKilled)
+        {
+            // Since an enemy was just killed, remove it from our collection of enemies on screen
+            enemiesOnScreen.Remove(enemy);
+
+            currentLevelStatistics.TotalEnemiesKilled++;
+
+            if (wasBossReleased)
+            {
+                //// The boss has been killed...!
+
+                // Let the HUD show the level statistics screen
+                hudManager.OnLevelComplete();
+
+                // Show the level statistics screen
+                CurrentState = LevelStates.LevelStatisticsTransition;
+            }
+        }
+    }
+
+    private void Update () {
+        if (CurrentState == LevelStates.DoingWave || CurrentState == LevelStates.WaitingToClearRemainingEnemies)
+        {
+            currentLevelStatistics.UpdateTimer(Time.deltaTime, enemiesOnScreen.Count > 0);
+        }
+
+        wpmHUD.text = String.Format("{0} WPM", currentLevelStatistics.WordsPerMinute.ToString(CultureInfo.InvariantCulture));
+
+        if (cameraLookingAtBoss)
+        {
+            if (bossBehaviour != null)
+            {
+                MainCamera.transform.LookAt(bossBehaviour.WordPosition);
+            }
+        }
+
+        if (Input.GetMouseButtonDown(0))
+        {
+            // If the left-mouse button is pressed, we should lock the screen. 
+            // unless the game is paused because then we need to show the mouse
+            if (Time.timeScale != 0)
+            {
+                Screen.lockCursor = true;
+            }
+        }
+
+		if(Input.GetAxisRaw("Whammy Bar")> 0.3|| Input.GetAxisRaw("Whammy Bar") < -0.3)
+		{
+            var whammy = Input.GetAxisRaw("Whammy Bar");
+            whammy = HomelessMethods.Map(whammy, -1, 1, 1, 0);
+            SetTimeScale(whammy);
+		}
+
+        if (Input.GetButtonDown("Guitar Green Button"))
+        {
+            if (enemiesOnScreen.Count > 0)
+            {
+                IEnemy closestEnemy = null;
+                float minDistance = 0;
+                foreach (var enemyOnScreen in enemiesOnScreen)
+                {
+                    var distanceToPlayer = Vector3.Distance(player.transform.position, enemyOnScreen.Position);
+                    if (closestEnemy == null)
+                    {
+                        closestEnemy = enemyOnScreen;
+                        minDistance = distanceToPlayer;
+                        continue;
+                    }
+
+                    if (minDistance > distanceToPlayer)
+                    {
+                        closestEnemy = enemyOnScreen;
+                        minDistance = distanceToPlayer;
+                    }
+                }
+                
+                if (closestEnemy != null)
+                {
+                    _WordCompleted(new MessageWordCompleted(closestEnemy, true));
+                }
+            }
+        }
+
+        if (Input.GetKeyDown("escape")|| Input.GetKeyDown("joystick button 9"))
+        {
+            if (Time.timeScale == 1)
+            {
+                // We need to pause the game
+                FindObjectsOfType(typeof(InteractiveCloth)).Cast<InteractiveCloth>().ToList().ForEach(cloth => cloth.enabled = false);
+                pausedMenu.ShowMenu();
+            } else
+            {
+                // We need to resume the game
+                pausedMenu.HideMenu();
+                FindObjectsOfType(typeof(InteractiveCloth)).Cast<InteractiveCloth>().ToList().ForEach(cloth => cloth.enabled = true);
+            }
+        }
+
+    }
+
+    /// <summary>
+    /// The player has been killed
+    /// </summary>
+    /// <param name="message"></param>
+	private void _PlayerDied(MessagePlayerDied message) {
+
+        audioManager.PitchOutSong();
+
+        // Let the HUD show the level statistics screen
+        hudManager.OnPlayerDied();
+
+        if (wasBossReleased)
+        {
+            /*
+            StartCoroutine(HomelessMethods.Interpolate(MainCamera.transform.position.y, -3.569896f, 1f,
+                                                       InterpolationMethods.Lerp, f =>
+                                                                                      {
+                                                                                          var curr = MainCamera.transform.position;
+                                                                                          MainCamera.transform.position = new Vector3(curr.x, f, curr.z);
+                                                                                      }));
+            */
+            MainCamera.gameObject.AddComponent<Rigidbody>();
+
+        } else
+        {
+            iTween.ShakePosition(MainCamera.transform.gameObject, new Vector3(0.6f, 0.5f, 0.0f), 3);
+        }
+
+        CurrentState = LevelStates.LevelStatisticsTransition;
+	}
+
+    /// <summary>
+    /// The player just finished typing a full word
+    /// </summary>
+	private void _WordCompleted(MessageWordCompleted message)
+    {
+        message.Enemy.ShowScore(message.Enemy.Settings.scorePerWord * (ScoreComboManager.CurrentComboCount.Count + 1));
+        ScoreComboManager.RegisterWord(message.Enemy.Settings.scorePerWord);
+        KillEnemy(message.Enemy, true);
+	}
+
+    private void _PowerupTyped(MessagePowerupTyped messagePowerupTyped)
+    {
+        player.Shoot(messagePowerupTyped.CratePowerup.crateCollider.transform, 1);
+        messagePowerupTyped.CratePowerup.ShowScore();
+        ScoreComboManager.RegisterWord(messagePowerupTyped.CratePowerup.PowerupBehaviour.score);
+    }
+
+    IEnumerator FluctuateTimescale(float fluctuatedTime, float fluctuateTo)
+    {
+            yield return StartCoroutine(InterpolateTimeScale(1f, fluctuateTo, 0.1f, 0f));
+            yield return new WaitForSeconds(fluctuatedTime);
+            yield return StartCoroutine(InterpolateTimeScale(fluctuateTo, 1f, 0.3f, 0f));
+    }
+
+    private void SetTimeScale(float timeScale)
+    {
+        audio.pitch = timeScale;
+        player.audio.pitch = timeScale;
+
+        Time.timeScale = timeScale;
+        audioManager.AdjustPitch(timeScale, true);
+    }
+
+    IEnumerator InterpolateTimeScale(float from, float to, float time, float initialDelay, Func<IEnumerator> callback = null)
+    {
+        yield return new WaitForSeconds(initialDelay);
+
+        StartCoroutine(HomelessMethods.Interpolate(from, to, time, InterpolationMethods.Lerp, SetTimeScale, () =>
+                                                                                                                {
+                                                                                                                    if (callback != null)
+                                                                                                                    {
+                                                                                                                        StartCoroutine(callback());
+                                                                                                                    }
+                                                                                                                }));
+    }
+
+    private void KeyPressed(object sender, KeyPressedEventArgs keyPressedEventArgs)
+    {
+            var key = keyPressedEventArgs.Key;
+            if (Time.timeScale == 0 || 
+                (CurrentState != LevelStates.DoingWave) && 
+                (CurrentState != LevelStates.WaitingToClearRemainingEnemies) && 
+                (CurrentState != LevelStates.BossBattle) &&
+                (CurrentState != LevelStates.WaveStatistics) &&
+                (CurrentState != LevelStates.IncrementingWaveNumber)
+                )
+            {
+                Debug.Log("Not allowing key due to current state: " + CurrentState);
+                return;
+            }
+
+        /*
+            if (enemiesOnScreen.Count < 1)
+            {
+                // We only want to record keystrokes while there are enemies on screen
+                return;
+            }
+        */
+
+            // Here I need to check whether any of the enemies have a match on the letter
+            var enemyContainsKey = enemiesOnScreen.Any(enemy => enemy.WillKeyMatch(key));
+            var powerupContainersContainsKey = powerupManager.WillKeyMatchOnScreenPowerupContainers(key);
+
+            var isKeyMatch = enemyContainsKey || powerupContainersContainsKey;
+            if (!isKeyMatch)
+            {
+                //// This key is not a hit
+
+                 stressSlider.MoveSlider(stressSlider.RealTimeValue + 0.1f, 1f);
+                 motionBlur.blurAmount += 0.05f;
+
+                // Break the current combo if we have one since the
+                ScoreComboManager.BreakCombo();
+            }
+            else
+            {
+                // This key is a correct hit
+            }
+
+            // Add the pressed key to the statistics
+            currentLevelStatistics.InputKey(key, isKeyMatch);
+
+            currentWaveAccuracyHUD.text = String.Format("{0}%", currentLevelStatistics.Accuracy);
+
+            new MessageKeyPressed(key.ToString(CultureInfo.InvariantCulture));
+    }
+
+    IEnumerator LevelStatisticsTransition_EnterState()
+    {
+        SendStatsToKongregate();
+        powerupManager.DeactivateSpecialPowerups();
+        heartbeatMonitor.StopBeating();
+        yield return null;
+    }
+
+    IEnumerator LevelStatistics_EnterState()
+    {
+        StopSpawningEnemies();
+
+        foreach (IEnemy enemy in enemiesOnScreen)
+        {
+            enemy.Obliterate();
+        }
+
+        // Wait until the return key is pressed before going back to the main menu
+        while (!Input.anyKey)
+        {
+            yield return null;
+        }
+
+        Application.LoadLevel("StartMenu");
+    }
+
+    IEnumerator DoingWave_EnterState()
+    {
+        InvokeRepeating("GenerateEnemy", 0.1f, enemySpawnInterval);
+
+        if (timeAllocatedToWaveSeconds < 5)
+        {
+            throw new Exception("Increase the time of the wave.");
+        }
+
+        // Wait for that amount to let the wave happen
+        yield return new WaitForSeconds(timeAllocatedToWaveSeconds);
+
+        // If we're still doing the wave
+        if (CurrentState == LevelStates.DoingWave)
+        {
+            // Now we need to wait until all remaining eliminated are elimated
+            CurrentState = LevelStates.WaitingToClearRemainingEnemies;
+        }
+    }
+
+    IEnumerator WaitingToClearRemainingEnemies_EnterState()
+    {
+        StopSpawningEnemies();
+
+        // While there are still enemies on screen, wait...
+        while (enemiesOnScreen.Count > 0)
+        {
+            yield return null;
+        }
+
+        //// All the enemies are cleared!
+        StartCoroutine(HomelessMethods.Interpolate(0f, 1f, 0.5f, InterpolationMethods.Lerp, i =>
+        {
+            waveCompletePanel.alpha = i;
+        }));
+        yield return new WaitForSeconds(0.5f);
+        audio.PlayOneShot(waveStartAudio);
+
+        // Show the wave statistics screen
+        CurrentState = LevelStates.WaveStatistics;
+
+        yield return new WaitForSeconds(1.5f);
+
+        StartCoroutine(HomelessMethods.Interpolate(1f, 0f, 0.5f, InterpolationMethods.Lerp, i =>
+        {
+            waveCompletePanel.alpha = i;
+        }));
+
+        // Wait some time before transitioning to the Wave Statistics screen
+        // yield return new WaitForSeconds(1);
+    }
+
+    IEnumerator WaveStatistics_EnterState()
+    {
+        // Record the completed wave
+        currentLevelStatistics.WavesCompleted++;
+
+        // Update the stats on Kongregate
+        SendStatsToKongregate();
+
+        // Decrease the stress level since we've just cleared an entire wave
+        stressSlider.MoveSlider(0, 2f);
+
+        // For now, since I'm not showing any statistics, I'm just gonna wait for x seconds and then start the new wave
+        yield return new WaitForSeconds(1.5f);
+        CurrentState = LevelStates.IncrementingWaveNumber;
+    }
+
+    IEnumerator IncrementingWaveNumber_EnterState()
+    {
+        // TODO: debug: sending stats at begining of game as well
+        SendStatsToKongregate();
+
+
+        // Increment the current wave
+        currentWave += 1;
+
+        string waveText;
+        if (currentWave > wavesBeforeBoss)
+        {
+            waveText = "BOSS";
+        }
+        else
+        {
+            waveText = String.Format("Wave {0}", currentWave);
+        }
+
+        // Set the wave number or BOSS text
+        waveNumberHUD.text = currentWave.ToString("00");
+
+        // Play the audio signifying the new wave
+        // audio.PlayOneShot(waveStartAudio);
+
+        //iTween.ShakePosition(MainCamera.transform.gameObject, new Vector3(0.2f, 0.1f, 0.0f), 1);
+
+        if (currentWave > wavesBeforeBoss)
+        {
+            CurrentState = LevelStates.BossBattle;
+        }
+        else
+        {
+            CurrentState = LevelStates.DoingWave;
+        }
+
+        yield return null;
+    }
+
+    IEnumerator BossBattle_EnterState()
+    {
+        wasBossReleased = true;
+
+        StartCoroutine(HomelessMethods.Interpolate(tiltShiftEffect.focalPoint, 20f, 5f, InterpolationMethods.Lerp, f =>
+                                                                                                                       {
+                                                                                                                           tiltShiftEffect.focalPoint = f;
+                                                                                                                       }));
+            
+        bossBehaviour = GenerateBoss();
+
+	    iTween.MoveTo(MainCamera.gameObject, new Hashtable
+	        {
+	            {"path", iTweenPath.GetPath("BossCameraPath")},
+	            {"movetopath", false},
+	            {"easetype", iTween.EaseType.linear},
+	            {"time", 2.0f},
+	            //{"orienttopath", true},
+	            {"looktime", 0.1f},
+	            {"oncompletetarget", gameObject},
+	            {"oncomplete", "OnCameraBossMoveComplete"},
+	        });
+
+        //MainCamera.transform.LookAt(bossBehaviour.transform);
+
+        yield return null;
+    }
+
+    IEnumerator OnCameraBossMoveComplete()
+    {
+        // MainCamera.transform.LookAt(bossBehaviour.WordPosition);
+        //var cameraLookRotation = Quaternion.LookRotation(MainCamera.transform.position, bossBehaviour.WordPosition).eulerAngles;
+        /*
+        var currentRotation = MainCamera.transform.eulerAngles;
+        Debug.Log("Current rotation: " + currentRotation);
+        var cameraLookRotation = Quaternion.LookRotation(bossBehaviour.WordPosition, MainCamera.transform.position).eulerAngles;
+        //cameraLookRotation.x = 0;
+        cameraLookRotation.z = 0;
+        StartCoroutine(HomelessMethods.Interpolate(transform.rotation, Quaternion.Euler(cameraLookRotation), 1f, Quaternion.Slerp,quaternion =>
+                                                                                                                                        {
+                                                                                                                                            MainCamera.transform.rotation = quaternion;
+                                                                                                                                        },() =>
+                                                                                                                                              {
+                                                                                                                                                  cameraLookingAtBoss = true;
+                                                                                                                                              }));
+        */
+
+        yield return new WaitForSeconds(10f);
+        cameraLookingAtBoss = true;
+        yield return null;
+    }
+
+    private void IncreaseWordDifficulty() {
+        wordDifficultyPercentage += 0.5f;
+
+        wordDifficultyPercentage = Mathf.Clamp(wordDifficultyPercentage, 1, 100);
+    }
+
+    private string FormatScore(int score, string leadingZerosRGBColor, int totalDigits)
+    {
+        var scoreString = score.ToString(CultureInfo.InvariantCulture);
+        var zeros = totalDigits - scoreString.Length;
+        if (score == 0)
+        {
+            scoreString = String.Empty;
+            zeros++;
+        }
+
+        return String.Format("[{0}]{1}[-]{2}", leadingZerosRGBColor, new string('0', zeros <= 0 ? 0 : zeros), scoreString);
+    }
+
+    private void UpdateScoreLabel(float score)
+    {
+        var scoreString = FormatScore((int) score, "7b787b", 10);
+        scoreBoard.supportEncoding = true;
+        scoreBoard.text = scoreString;
+    }
+
+    // Increments the current score by the given increment
+	private void UpdateScore(int increment)
+	{
+	    var previousScore = GameStatistics.Instance.Score;
+        StartCoroutine(HomelessMethods.Interpolate(previousScore, (float)previousScore + increment, 0.5f, Mathf.SmoothStep, i => UpdateScoreLabel(Mathf.Floor(i))));
+		GameStatistics.Instance.Score += increment;
+	}
+
+    private readonly List<Vector3> spawnpoints = new List<Vector3>();
+    private void OnDrawGizmos()
+    {
+            foreach (var spawnpoint in spawnpoints)
+            {
+                    //Gizmos.DrawSphere(spawnpoint, 5);
+            }
+    }
+
+    private IEnumerable<string> GenerateWords(int numberOfWords)
+    {
+        for (int i = 0; i < numberOfWords; i++)
+        {
+            var randomWordIndex = GetDifficultyWordIndex(wordDifficultyPercentage);
+            yield return words.ElementAt(randomWordIndex);
+        }
+    }
+
+    /// <summary>
+    /// Currently also increases word difficulty with each spawn
+    /// </summary>
+	private void GenerateEnemy()
+    {
+        IncreaseWordDifficulty();
+		//var entrance = entrances[UnityEngine.Random.Range(0, entrances.Count)];
+		//var somewhereInEntranceX = UnityEngine.Random.Range(entrance.Left.x, entrance.Right.x);
+
+        var spawnPosition = spawnPoint.transform.position;
+
+        spawnpoints.Add(spawnPosition);
+        /*
+        var ray = new Ray(spawnPosition + Vector3.up * 2.7f, player.transform.position - spawnPosition);
+        var distance = Vector3.Distance(spawnPosition, player.transform.position);
+
+        RaycastHit hit;
+        var rayHit = Physics.Raycast(ray, out hit, distance, letterlayer.value);
+        Debug.DrawLine(ray.origin, ray.origin + (ray.direction * distance), Color.red, 200);
+
+        var colliders = Physics.OverlapSphere(spawnPosition, 3f, letterlayer.value);
+        //Debug.Log("Colliders: " + colliders.Length);
+        if (colliders.Length > 0)
+        {
+            Debug.Log("Returning because too close");
+            return;
+        }
+
+        //var rayHit = Physics.SphereCast(ray, 10f, out hit, 10, letterlayer.value);
+        if (rayHit)
+        {
+            //Debug.Log("Hit: " + hit.transform.gameObject.name);
+            return;
+        }
+        */
+
+        //Debug.DrawRay(spawnPosition, player.transform.position - spawnPosition, Color.red, 10);
+        // Instantiate the enemy
+		var root = (GameObject)Instantiate(enemyModel, spawnPosition, Quaternion.identity);
+        root.SetActive(true);
+        var enemyBehaviour = root.GetComponent<EnemyBehaviour>();
+        enemyBehaviour.OnRequestToDie += enemyBehaviour_OnRequestToDie;
+        var model =(GameObject)Instantiate(GetRandomEnemyModel(enemyBehaviour), spawnPosition, Quaternion.identity);
+        model.transform.parent = root.transform;
+        model.name = "Model";
+        var enemySettings = model.GetComponent<EnemySettings>();
+
+        // Generate a random number based on the model's maximum allowed words.
+        var numberOfWordsForEnemy = UnityEngine.Random.Range(1, enemySettings.maximumNumberOfWords + 1); // The Range() integer overload's max parameter is exclusive -_-
+
+        // Generate the number of words we'll use for the enemy
+        var wordsForEnemy = GenerateWords(numberOfWordsForEnemy).ToList();
+        
+        // Set the words on the enemy
+        enemyBehaviour.SetWords(wordsForEnemy);
+
+        // Add the enemy to our collection of enemies on screen
+	    enemiesOnScreen.Add(enemyBehaviour);
+    }
+
+    void enemyBehaviour_OnRequestToDie(object sender, EventArgs e)
+    {
+        KillEnemy((IEnemy)sender, false);
+    }
+
+    private BossBehaviour GenerateBoss()
+    {
+        var bossesWords = new List<string>();
+        var totalBossWords = HomelessMethods.Map(difficulty, 1, 100, 5, 15);
+        for (int i = 0; i < totalBossWords; i++)
+        {
+            var wordIndex = GetDifficultyWordIndex(wordDifficultyPercentage += 2);
+            var wordText = words.ElementAt(wordIndex);
+            bossesWords.Add(wordText);
+        }
+
+        var bossInstance = (GameObject)Instantiate(boss, new Vector3(-41.82707f, -3.313119f, 48.19384f), Quaternion.identity);
+        bossInstance.SetActive(true);
+        var enemy = bossInstance.GetComponent<BossBehaviour>();
+        enemy.SetWords(bossesWords);
+
+	    enemiesOnScreen.Add(enemy);
+
+        return enemy;
+    }
+
+    /// <summary>
+    /// Update the player statistics to Kongregate
+    /// </summary>
+    private void SendStatsToKongregate()
+    {
+        //Debug.Log("Sending stats to Kongregate");
+        kongregateApi.SubmitStatistic("High Score", GameStatistics.Instance.Score);
+        kongregateApi.SubmitStatistic("Waves Completed", 1);
+        // GameSettings.KongregateApi.SubmitStatistic("Words Typed", 18231);
+        kongregateApi.SubmitStatistic("WPM", GameStatistics.Instance.CurrentLevel.WordsPerMinute);
+    }
+
+    /// <summary>
+    /// Returns a random model based on the model's weight
+    /// </summary>
+    private GameObject GetRandomEnemyModel(EnemyBehaviour behaviour)
+    {
+        // enemybehaviour is not needed in here...
+
+        // Filter the models to only allow the ones which are activated
+        var enabledModels = enemyModels.Where(enemy => enemy.GetComponent<EnemySettings>().activated).ToList();
+
+        // Get a random model based on their weight
+        var randomModel = enabledModels.Select(m => m.GetComponent<EnemySettings>()).Cast<IWeighable>().GetRandomWeightedElement<EnemySettings>();
+        return randomModel.gameObject;//.gameObject;
+    }
+
+	/// Gets an index based on the difficulty
+	private int GetDifficultyWordIndex(float difficultyPercentage) {
+		var wordIndex = Math.Floor((difficultyPercentage / 100) * words.Count);
+		var randomWordIndex = UnityEngine.Random.Range((float)(wordIndex - difficultyRange), (float)(wordIndex + difficultyRange));
+		return Mathf.Clamp((int)randomWordIndex, 0, words.Count - 1);
+	}
+
+    private void StopSpawningEnemies()
+    {
+        // Now we've past the time of the wave, so stop spawning enemies
+        CancelInvoke("GenerateEnemy");
+    }
+
+    /// <summary>
+    /// Returns and returns the collection of words 
+    /// </summary>
+	private List<string> ReadFile() {
+        var loaded = Resources.Load("dict") as TextAsset;
+        return loaded.text.Split('\n').ToList();
+	}
+}

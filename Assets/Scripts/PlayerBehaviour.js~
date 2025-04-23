@@ -1,0 +1,38 @@
+#pragma strict
+
+public var maxBulletsFire : int = 20;
+
+private var machineGunFire : AudioSource;
+private var dyingAnimation : DyingAnimation;
+
+function Start () {
+	Messenger.instance.Listen("game", this);
+	machineGunFire = transform.GetComponent(AudioSource);
+	dyingAnomation = transform.GetComponent(DyingAnimation);
+
+	Messenger.instance.Listen("game", this);
+}
+
+function _EnemyStrike(message : MessageEnemyStrike) {
+
+}
+
+function _EnemyFullMatch(message : MessageEnemyFullMatch) {
+	dyingAnimation.PlayAnimation();
+
+	var enemy = message.Enemy;
+	// Look at the enemy before we start shooting
+	transform.LookAt(message.Enemy.transform);
+
+	// Get a random number of bullets to fire
+	var bulletsToFire = Random.Range(2, maxBulletsFire);
+
+	enemy.ApplyDamage(bulletsToFire);
+
+	// play the machine gun noise
+	machineGunFire.Play();
+}
+
+function Update () {
+
+}

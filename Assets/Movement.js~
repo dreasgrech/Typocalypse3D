@@ -1,0 +1,32 @@
+#pragma strict
+
+public var speed : float;
+public var pointA : Transform;
+public var pointB : Transform;
+
+private var direction : int = 1;
+private var to : Vector3;
+private var startPosition : Vector3;
+
+function Start () {
+	transform.position = startPosition = pointA.position;
+}
+
+function Update () {
+	if (transform.position == pointA.position) {
+		to = pointB.position;
+	} else if (transform.position == pointB.position) {
+		to = pointA.position;
+	}
+
+	transform.position = Vector3.MoveTowards(transform.position, to, speed*Time.deltaTime);
+}
+
+function InversePoint(point : Vector3) : Vector3 {
+	return point == pointA.position ? pointB.position : pointA.position;
+}
+
+static function Hermite(start : float, end : float, value : float) : float
+{
+    return Mathf.Lerp(start, end, value * value * (3.0 - 2.0 * value));
+}

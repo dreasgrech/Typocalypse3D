@@ -1,0 +1,10 @@
+
+public class MessageInsaneButtonPressed extends Message {
+
+	function MessageInsaneButtonPressed() {
+		super("game");
+	}
+
+}
+
+

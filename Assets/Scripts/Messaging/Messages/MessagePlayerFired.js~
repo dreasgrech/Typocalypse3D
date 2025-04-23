@@ -1,0 +1,16 @@
+
+public class MessagePlayerFired : Message {
+
+	public EnemyBehaviour Enemy;
+	public int BulletsFired;
+
+	function MessagePlayerFired(enemy : EnemyBehaviour, bulletsFired : int) {
+		Enemy = enemy;
+		BulletsFired = bulletsFired;
+		super("game");
+	}
+
+}
+
+
+

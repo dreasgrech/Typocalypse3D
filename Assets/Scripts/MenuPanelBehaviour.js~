@@ -1,0 +1,58 @@
+public class MenuPanelBehaviour extends MonoBehaviour {
+	public var background : MonoBehaviour;
+	public var menu : MonoBehaviour;
+	public var uiRoot : GameObject;
+	public var typocalypseText : GameObject;
+	public var threeDText : GameObject;
+	public var menuCamera : Transform;
+
+	private var fadeOut : boolean;
+	private var fadeOutOnce : boolean;
+
+	function Start () {
+		Messenger.instance.Listen("game", this);
+		//widget = transform.GetComponent("UISprite");
+	}
+
+	function _NewGame(message : MessageNewGame) {
+		fadeOut = true;
+	}
+
+
+	function Update () {
+		if (fadeOut) {
+			if (!fadeOutOnce) {
+				fadeOutOnce = true;
+
+				var textBody = typocalypseText.AddComponent(Rigidbody);
+				textBody.AddTorque(Vector3.forward * 100);
+
+				var threeDTextRigidBody = threeDText.AddComponent(Rigidbody);
+				threeDTextRigidBody.AddTorque(-Vector3.forward * 100);
+
+				print(threeDTextRigidBody);
+			}
+
+			FadeObject(background, 1, 0, 2, function () {
+				fadeOut = false;
+				uiRoot.active = false;
+			});
+
+			FadeObject(menu, 1, 0, 2, function () {});
+		}
+
+		//widget.color = new Color(0,0,0,  Mathf.Lerp(0,255,Time.deltaTime));
+	}
+
+	function FadeObject(monoBehaviour : MonoBehaviour, startPos : float, endPos : float, time : float, callback : Function) {
+	    var i = 0.0;
+	    var rate = 1.0/time;
+	    while (i < 1.0) {
+		i += Time.deltaTime * rate;
+		monoBehaviour.alpha = Mathf.Lerp(startPos, endPos, i);
+		yield; 
+	    }
+
+	    callback();
+	}
+}

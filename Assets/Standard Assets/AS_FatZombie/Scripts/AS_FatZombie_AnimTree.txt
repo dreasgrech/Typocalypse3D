@@ -1,0 +1,184 @@
+{
+  "_comment":"This file defines the animations and states needed for Mixamo's Animation state Machine.",
+  "name": "AS_FatZombie_AnimTree",
+  "root_path": "BN_Pelvis",
+  "ground_transform": "GroundTransform",
+  "clips": [
+    {
+      "name": "idle_clip",
+      "anim_name": "Idle",
+      "type": "normal",
+      "root_motion_translation": ""
+    },
+    {
+      "name": "turn_left_clip",
+      "anim_name": "Turn_Left",
+      "type": "normal",
+      "root_motion_translation": ""
+    },
+    {
+      "name": "turn_right_clip",
+      "anim_name": "Turn_Right",
+      "type": "normal",
+      "root_motion_translation": ""
+    },
+    {
+      "name": "walk_clip",
+      "anim_name": "Walk",
+      "type": "normal",
+      "root_motion_translation": "z"
+    },
+	{
+      "name": "walk_backwards_clip",
+      "anim_name": "Walk_Backwards",
+      "type": "normal",
+      "root_motion_translation": "z"
+    },
+    {
+      "name": "run_clip",
+      "anim_name": "Run",
+      "type": "normal",
+      "root_motion_translation": "z"
+    },
+    {
+      "name": "attack_melee_clip",
+      "anim_name": "Attack_Melee",
+      "type": "normal",
+      "root_motion_translation": ""
+    },
+    {
+      "name": "deform_test_clip",
+      "anim_name": "Take 001",
+      "type": "normal",
+      "root_motion_translation": ""
+    },
+	{
+      "name": "jump_clip",
+      "anim_name": "Jump",
+      "type": "normal",
+      "root_motion_translation": ""
+    }
+  ],
+  "layers": [
+    {
+      "name": "full body",
+      "priority": 1,
+      "states": [
+        {
+          "name": "idle",
+          "tree": {
+            "type": "clip",
+            "name": "idle_clip"
+          },
+          "transitions": [
+          	{
+              "destination": "attack_melee",
+              "type": "crossfade",
+              "duration": 0.1
+            },
+            {
+              "destination": "*",
+              "type": "crossfade",
+              "duration": 0.5
+            }
+          ]
+        },
+        {
+          "name": "turn_left",
+          "tree": {
+            "type": "clip",
+            "name": "turn_left_clip"
+          },
+          "transitions": [
+            {
+              "destination": "*",
+              "type": "crossfade",
+              "duration": 0.3
+            }
+          ]
+        },
+        {
+          "name": "turn_right",
+          "tree": {
+            "type": "clip",
+            "name": "turn_right_clip"
+          },
+          "transitions": [
+            {
+              "destination": "*",
+              "type": "crossfade",
+              "duration": 0.3
+            }
+          ]
+        },
+		{
+            "name": "move",
+            "tree": {
+                "type": "blend2d",
+                "control": "ctrl_move",
+                "blend1": {
+                    "type": "clip",
+                    "name": "walk_clip"
+                },
+                "blend2": {
+                    "type": "clip",
+                    "name": "run_clip"
+                }
+			},
+            "transitions": [
+                {
+                    "destination": "*",
+                    "type": "crossfade",
+                    "duration": 0.2
+                }
+            ]
+        },
+        {
+          "name": "attack_melee",
+		  "is_looping": false,
+          "tree": {
+            "type": "clip",
+            "name": "attack_melee_clip"
+          },
+          "transitions": [
+            {
+              "destination": "*",
+              "type": "crossfade",
+              "duration": 0.3
+            }
+          ]
+        },
+		{
+          "name": "jump",
+		  "is_looping": false,
+          "tree": {
+            "type": "clip",
+            "name": "jump_clip"
+          },
+          "transitions": [
+            {
+              "destination": "*",
+              "type": "crossfade",
+              "duration": 0.3
+            }
+          ]
+        },
+		{
+          "name": "deform_test",
+		  "is_looping": false,
+          "tree": {
+            "type": "clip",
+            "name": "deform_test_clip"
+          },
+          "transitions": [
+            {
+              "destination": "*",
+              "type": "crossfade",
+              "duration": 0.3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+using UnityEngine;
+using System;
+using System.Collections;
+
+[Flags]
+public enum MainMenuStates
+{
+    NewGameScreen = 1,
+    DifficultyScreen = 2,
+}
+
+public class MenuPanelBehaviour : StateMachine<MainMenuStates> {
+
+	public MonoBehaviour background;
+	public GameObject newGamePanel;
+	public GameObject difficultyPanel; // needed because it's shown after 'New Game' is clicked
+	public GameObject typocalypseText;
+	public GameObject threeDText;
+	public Transform menuCamera;
+	//public NewGameButtonBehaviour button;
+
+
+	// Use this for initialization
+	void Start ()
+	{
+	    IsDebug = true;
+		Messenger.instance.Listen("game", this);
+        SetState(MainMenuStates.NewGameScreen);
+        //button.OnPress += () => { };
+	}
+
+    private IEnumerator DifficultyScreen_EnterState()
+    {
+        newGamePanel.SetActive(false);
+        difficultyPanel.SetActive(true);
+        yield return null;
+    }
+
+    private void _DifficultyButtonPressed(MessageDifficultyButtonPressed message)
+    {
+		PlayerPrefs.SetFloat("Difficulty", message.Difficulty);
+		Application.LoadLevel("One");
+    }
+
+	private void _NewGameButtonPressed(MessageNewGameButtonPressed message) {
+        SetState(MainMenuStates.DifficultyScreen);
+	    var x = 2;
+	}
+	
+	// Update is called once per frame
+	void Update () {
+	
+	}
+}

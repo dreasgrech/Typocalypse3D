@@ -1,0 +1,11 @@
+
+public class MessageEnemyFullMatch : Message {
+
+	public EnemyBehaviour Enemy;
+
+	function MessageEnemyFullMatch(EnemyBehaviour enemy) : base("game") {
+		Enemy = enemy;
+	}
+
+}
+

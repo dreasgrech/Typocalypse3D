@@ -1,0 +1,15 @@
+#pragma strict
+#pragma implicit
+#pragma downcast
+
+public class MessagePlayerDied extends Message {
+
+	function MessagePlayerDied() {
+		super("game");
+	}
+
+}
+
+
+
+

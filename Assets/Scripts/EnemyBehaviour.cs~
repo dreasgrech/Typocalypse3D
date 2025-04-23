@@ -1,0 +1,123 @@
+using UnityEngine;
+using System.Collections;
+
+public class EnemyBehaviour : MonoBehaviour {
+
+	public float speed;
+	public bool dead;
+	public GameObject[] blood;
+	public AudioSource dyingAudio;
+
+	private GameObject player;
+	private bool done;
+	private float enemyHeight = 1.250463f;
+	private DyingAnimation dyingAnimation;
+	private GameObject word;
+
+	// Use this for initialization
+	private void Start () {
+		dead = false;
+		// TODO: FindWithTag is costly; find another way to get reference to the player
+		player = GameObject.FindWithTag("Player");
+		dyingAnimation = transform.GetComponent<DyingAnimation>();
+		Messenger.instance.Listen("game", gameObject);
+
+		word = transform.Find("Word").gameObject;
+	}
+
+    private void _PlayerFired(MessagePlayerFired message)
+    {
+		if (message.Enemy == this) {
+			Kill();
+		}
+    }
+
+    private void _EnemyStrike(MessageEnemyStrike message)
+    {
+		if (message.Enemy != this) {
+			done = true;
+			//animation.CrossFade("Idle");
+		}
+    }
+
+	private void ApplyDamage(int bulletsFired) {
+        // The player has just informed us that he fired shots
+
+		Debug.Log("Recieved hits: " + bulletsFired);
+		for (var i = 0; i < bulletsFired; ++i) {
+			// Get one of the random blood splatters]
+			var randomBlood = GetRandomBloodSplatter();
+
+			// Attach the SelfDestruct script so that each blood splatter is removed after an x amount of seconds
+			randomBlood.AddComponent("SelfDestruct");
+
+			// Generate a random point on the y-axis on where to apply the blood
+			var randomPositionY = Random.Range(0, enemyHeight);
+
+			// Calculate the full position of the blood splatter
+			var pos = new Vector3(transform.position.x, randomPositionY, transform.position.z);
+
+			// Splash!
+			Instantiate(randomBlood, pos, Quaternion.identity);
+		}
+	}
+
+	private GameObject GetRandomBloodSplatter() {
+		var index = Random.Range(0, blood.Length - 1);
+		return blood[index];
+	}
+
+	private void Update () {
+		if (dead) {
+			return;
+		}
+
+		transform.LookAt(player.transform);
+		if (!done) {
+			transform.position = Vector3.MoveTowards(transform.position, player.transform.position, Time.deltaTime * speed);
+		}
+
+		//ChangeAnimationSpeed(speed);
+
+		var distanceFromPlayer = Vector3.Distance(transform.position, player.transform.position);
+		if (distanceFromPlayer < 1) {
+			if (!done) {
+				done = true;
+				StrikePlayer();
+			}
+		}
+	}
+
+	private void StrikePlayer() {
+		new MessageEnemyStrike(this);
+		ChangeAnimationSpeed(1);
+		animation.CrossFadeQueued("Zombie_hit", 0.3f, QueueMode.PlayNow);
+		animation.CrossFadeQueued("Zombie_Scream", 0.3f, QueueMode.CompleteOthers);
+		animation.CrossFadeQueued("Idle", 0.3f, QueueMode.CompleteOthers);
+	}
+
+	private void ChangeAnimationSpeed(float newSpeed) {
+		foreach (AnimationState state in animation) {
+		    state.speed = newSpeed;
+		}
+	}
+
+	private void Kill() {
+		dead = true;
+		Destroy(word);
+		dyingAnimation.PlayAnimation();
+		dyingAudio.Play();
+
+		// Completely destroy the game object in 2 seconds
+		InvokeRepeating("DestroySelf", 5, 0);
+
+	}
+
+	public void DestroySelf() {
+		Destroy(transform.gameObject);
+	}
+
+	public string GetText() {
+		return ((TTFText)transform.Find("Word").GetComponent("TTFText")).Text;
+	}
+}

@@ -1,0 +1,86 @@
+using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System;
+using System.IO;
+using System.Linq;
+
+public class Entrance {
+	public Vector3 Left {get; set;}
+	public Vector3 Right {get; set;}
+
+	public Entrance(Vector3 left, Vector3 right) {
+		Left = left;
+		Right = right;
+	}
+}
+
+public class CentralLogicScript : MonoBehaviour {
+
+	private List<string> words;
+	public GameObject enemy;
+	public float difficulty; // percentage
+	public List<Entrance> entrances = new List<Entrance>() {
+		new Entrance(new Vector3(9.363613f, 0.8857107f, -12f), new Vector3(6.781803f, 0.8857107f, -12f)),
+		new Entrance(new Vector3(0.5166297f, 0.8857107f, -12f), new Vector3(-1.697498f, 0.8857107f, -12f)),
+		new Entrance(new Vector3(-7.60805f, 0.8857107f, -12f), new Vector3(-9.604151f, 0.8857107f, -12f))
+	};
+	//public TTFText TextRenderer;
+
+	void Start () {
+		words = ReadFile();
+		//InvokeRepeating("Run", 5, 5);
+	}
+	
+	// Update is called once per frame
+	void Update () {
+		if(Input.GetMouseButtonDown(0)) {
+			Run();
+		}
+	}
+
+	void Run() {
+		//while (true) {
+			GenerateEnemy();
+			if (difficulty <= 0) {
+				difficulty = 1;
+			}
+
+			//var wait =(float)(UnityEngine.Random.Range(1f, 3f) * (1.0 / difficulty));
+			//yield return new WaitForSeconds(wait);
+		//}
+	}
+
+	private void GenerateEnemy() {
+		var entrance = entrances[UnityEngine.Random.Range(0, entrances.Count)];
+		var somewhereInEntranceX = UnityEngine.Random.Range(entrance.Left.x, entrance.Right.x);
+		
+		var clonedZombie = (GameObject)Instantiate(enemy, new Vector3(somewhereInEntranceX, entrance.Left.y, entrance.Left.z), Quaternion.identity);
+		//clonedZombie.Find
+		//var clonedText = (TTFText)Instantiate(TextRenderer, Vector3.zero, Quaternion.identity);
+		//clonedText.transform.parent = go.transform;
+		//print(clonedText.transform.position);
+		//var o = clonedZombie.transform.Find("Word");
+
+		//var textComponent = o.gameObject.AddComponent("TTFText");
+		//((TTFText)textComponent).Text = "Lol!!";
+
+		//((TTFText)((GameObject)clonedZombie).transform.Find("Word").GetComponent("TTFText")).Text = "Hello World";
+		//print(word);
+	}
+
+	private List<string> ReadFile() {
+		var list = new List<string>();
+		FileInfo theSourceFile = new FileInfo (@"Assets\dict.txt");
+		StreamReader reader = theSourceFile.OpenText();
+		string text;
+		do
+		{
+		    text = reader.ReadLine();
+		    list.Add(text);
+		    //Console.WriteLine(text);
+		    //print (text);
+		} while (text != null); 
+		return list;
+	}
+}

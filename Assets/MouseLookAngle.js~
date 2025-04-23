@@ -1,0 +1,11 @@
+#pragma strict
+
+function Start () {
+
+}
+
+function Update () {
+	var aimWorldP = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+	aimWorldP.z = bowPosition.z;
+	transform.LookAt(aimWorldP);
+}

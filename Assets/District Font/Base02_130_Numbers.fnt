@@ -1,0 +1,16 @@
+info face="Base 02" size=130 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1 outline=0
+common lineHeight=130 base=108 scaleW=256 scaleH=256 pages=1 packed=0 alphaChnl=0 redChnl=4 greenChnl=4 blueChnl=4
+page id=0 file="Base02_130_Numbers_0.tga"
+chars count=12
+char id=32   x=239   y=0     width=3     height=1     xoffset=-1    yoffset=129   xadvance=44    page=0  chnl=15
+char id=44   x=207   y=155   width=37    height=36    xoffset=-11   yoffset=89    xadvance=21    page=0  chnl=15
+char id=48   x=167   y=83    width=65    height=71    xoffset=-12   yoffset=38    xadvance=54    page=0  chnl=15
+char id=49   x=180   y=0     width=58    height=77    xoffset=-8    yoffset=38    xadvance=42    page=0  chnl=15
+char id=50   x=114   y=0     width=65    height=82    xoffset=-12   yoffset=38    xadvance=54    page=0  chnl=15
+char id=51   x=97    y=89    width=69    height=72    xoffset=-3    yoffset=37    xadvance=57    page=0  chnl=15
+char id=52   x=0     y=170   width=72    height=70    xoffset=-2    yoffset=40    xadvance=57    page=0  chnl=15
+char id=53   x=0     y=92    width=96    height=77    xoffset=-18   yoffset=31    xadvance=58    page=0  chnl=15
+char id=54   x=73    y=170   width=68    height=70    xoffset=-14   yoffset=38    xadvance=56    page=0  chnl=15
+char id=55   x=0     y=0     width=57    height=91    xoffset=0     yoffset=39    xadvance=52    page=0  chnl=15
+char id=56   x=142   y=162   width=64    height=69    xoffset=-6    yoffset=38    xadvance=56    page=0  chnl=15
+char id=57   x=58    y=0     width=55    height=88    xoffset=-1    yoffset=29    xadvance=55    page=0  chnl=15

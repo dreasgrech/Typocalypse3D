@@ -1,0 +1,20 @@
+
+public var dyingAnimations : AnimationClip[];
+
+function Start () {
+	for (var i = 0; i < dyingAnimations.Length; ++i) {
+		animation.AddClip(dyingAnimations[i], dyingAnimations[i].name);
+	}
+
+	var index = Random.Range(0, dyingAnimations.Length - 1);
+	var randomDyingAnimation = dyingAnimations[index];
+	print(randomDyingAnimation.name);
+	animation.CrossFade(randomDyingAnimation.name, 0.2);
+}
+
+function Update () {
+
+}
+
+public function PlayAnimation() {
+}

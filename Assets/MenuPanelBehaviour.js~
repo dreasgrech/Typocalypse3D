@@ -1,0 +1,12 @@
+#pragma strict
+
+function Start () {
+var widget : UISptire;
+
+widget.alpha = Mathf.Lerp(0,255,Time.deltaTime);
+widget.color = new Color(0,0,0,  Mathf.Lerp(0,255,Time.deltaTime));
+}
+
+function Update () {
+
+}

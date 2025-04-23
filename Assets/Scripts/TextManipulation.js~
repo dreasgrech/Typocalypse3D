@@ -1,0 +1,94 @@
+
+public var inactiveColor : Color;
+public var activeColor : Color;
+private var word : Transform;
+
+private var totalCharacters : int;
+private var canStart : boolean = false;
+private var ourString : String;
+private var activeCharacterIndex : int = 0;
+private var zombie : EnemyBehaviour;
+
+function Start() {
+	zombie = transform.GetComponent(EnemyBehaviour);
+	word = transform.Find("Word");
+	ourString = word.GetComponent(TTFText).Text;
+
+	Messenger.instance.Listen("typing", this);
+	Messenger.instance.Listen("game", this);
+}
+
+function _EnemyFullMatch(message : MessageEnemyFullMatch) {
+	activeCharacterIndex = 0;
+	ColorString(activeCharacterIndex);
+}
+
+function _KeyPressed(msg : MessageKeyPressed) {
+	if (zombie.dead) {
+		return;
+	}
+
+	if (ourString[activeCharacterIndex] == msg.Key) {
+		//ColorString(++activeCharacterIndex);
+		++activeCharacterIndex;
+	}
+
+	if (activeCharacterIndex == ourString.Length) {
+		// Inform the others that a zombie has been matched
+		new MessageEnemyFullMatch(this);
+
+		// Remove the word from on screen
+		// TODO: do it a bit more dramatic than just disappearing...
+		Destroy(word.gameObject);
+	}
+}
+
+function Update () {
+	/*
+	print(word.childCount);
+	if (!canStart && word.childCount > 0) {
+		// we go in here only once; and once we can accessed the word
+		canStart = true;
+		ColorString(0);
+		print('aha');
+	}
+	*/
+
+	ColorString(activeCharacterIndex);
+}
+
+function IterateCharacters(f : Function, offset : int) {
+	if (zombie.dead) {
+		return;
+	}
+
+	var index : int = 0;
+	for (var child : Transform in word) {
+		if (index++ < offset) {
+			continue;
+		}
+
+		var character = child.GetComponent("TTFSubtext");
+		var result = f(character, index - 1);
+		if (result) {
+			return result;
+		}
+	}
+
+}
+
+function ColorString(length : int) {
+	IterateCharacters(function (character, index) {
+		if (index > length) {
+			return true;
+		}
+
+		var mesh = character.GetComponent(MeshRenderer).materials;
+		mesh[0].color =  activeColor;
+	}, 0);
+
+	IterateCharacters(function (character, index) {
+		var mesh = character.GetComponent(MeshRenderer).materials;
+		mesh[0].color =  inactiveColor;
+	}, length);
+}
